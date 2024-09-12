@@ -1,2 +1,2 @@
-# post-processing
+# postprocessing
 a repository for effects
