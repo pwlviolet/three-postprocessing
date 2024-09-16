@@ -19,7 +19,7 @@ export const SobelOutlineShader = {
 		depthOutlineThickness: { value: 1.0 },
 		depthBias: { value: 0.1 },
 		normalOutlineThickness: { value:1.0 },
-		normalBias: { value: 0.1},
+		normalBias: { value: 0.2},
 
 	},
 
