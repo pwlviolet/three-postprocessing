@@ -11,15 +11,25 @@ import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min'
 import CameraControls from 'camera-controls';
 import { PencilLinesPass } from './PencilLinesPass';
 let gui = new GUI()
-// const params = {
-//   VignettingIntensity:1.0,
-//   r:0.5,
-//   center:new THREE.Vector2(0.0,0)
-// };
+const params = {
+  Edge:0.03
+};
+const color={
+  bgcolor:"#ffffff",
+  linecolor:"#ff0000"
+}
 // gui.add( params, 'VignettingIntensity' ).min( 0).max(5);
 // gui.add( params, 'r' ).min( 0 ).max( 1 );
-// gui.add( params.center, 'x' ).min( -1 ).max( 1 );
+gui.add( params, 'Edge' ).min( 0.01 ).max( 1 ).step(0.01);
 // gui.add( params.center, 'y' ).min( -1 ).max( 1 );
+gui.addColor(color,"bgcolor").onFinishChange((value)=>{
+  color.bgcolor=value
+})
+gui.addColor(color,"linecolor").onFinishChange((value)=>{
+  color.linecolor=value
+})
+
+
 const canvas = document.getElementById('three-canvas');
 CameraControls.install({ THREE: THREE });
 let cameracontrols;
@@ -93,19 +103,21 @@ let composer = new EffectComposer(renderer);
 composer.setPixelRatio(window.devicePixelRatio);
 composer.setSize(window.innerWidth, window.innerHeight);
 composer.addPass(new RenderPass(scene, camera));
-let pencilLinePass = new PencilLinesPass( renderer.domElement.clientWidth,renderer.domElement.clientHeight, scene, camera)
+let pencilLinePass = new PencilLinesPass( renderer.domElement.clientWidth,renderer.domElement.clientHeight, scene, camera,{
+  bgColor:new THREE.Vector3(0,0,0),
+  LineColor:new THREE.Vector3(0.32, 0.12, 0.2),
+  Edge:0.5
+})
 
 composer.addPass(pencilLinePass)
-composer.addPass(new ShaderPass(FXAAShader));
-// let vignettingPass=new VignettingPass()
-// composer.addPass(vignettingPass)
-// let colorpass=new ColorPass()
+// composer.addPass(new ShaderPass(FXAAShader));
+
 let animate = function () {
-  // vignettingPass.r=params.r
-  // vignettingPass.VignettingIntensity=params.VignettingIntensity
-  // vignettingPass.center=params.center
-  // colorpass.Contrast=params.Contrast
-  // colorpass.HueShift=params.HueShift
+  pencilLinePass.Edge=params.Edge
+  pencilLinePass.BgColor=new THREE.Color(color.bgcolor)
+  pencilLinePass.LineColor=new THREE.Color(color.linecolor)
+  // pencilLinePass.BgColor.set(color.bgcolor)
+  // pencilLinePass.LineColor.set(color.linecolor)
   requestAnimationFrame(animate);
   cameracontrols.update(clock.getDelta());
   renderer.render(scene, camera);

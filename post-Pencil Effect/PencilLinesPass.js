@@ -1,5 +1,5 @@
 import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass'
-import { WebGLRenderer, TextureLoader,WebGLRenderTarget, ShaderMaterial, Vector2, NearestFilter, HalfFloatType, RGBAFormat, MeshNormalMaterial } from 'three'
+import { WebGLRenderer, TextureLoader,WebGLRenderTarget, ShaderMaterial, Vector2,Vector3, NearestFilter, HalfFloatType, RGBAFormat, MeshNormalMaterial } from 'three'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader'
 import { PencilLinesMaterial } from './PencilLinesMaterial'
 // import { width, height } from './main'
@@ -7,8 +7,27 @@ import { PencilLinesMaterial } from './PencilLinesMaterial'
 export class PencilLinesPass extends Pass {
 	fsQuad
 	material
+	set BgColor(v) {
+		this.material.uniforms.ubgColor.value = v;
+	}
+	get BgColor() {
+		return this.material.uniforms.ubgColor.value;
+	}
+	set LineColor(v) {
+		this.material.uniforms.uLineColor.value = v;
+	}
+	get LineColor() {
+		return this.material.uniforms.uLineColor.value;
+	}
+	set Edge(v) {
+		this.material.uniforms.uedge.value = v;
+	}
+	get Edge() {
+		return this.material.uniforms.uedge.value;
+	}
 
-	constructor(width, height, scene, camera) {
+
+	constructor(width, height, scene, camera,options = {}) {
 
 		super()
 		const normalBuffer = new WebGLRenderTarget(width, height)
@@ -29,6 +48,10 @@ export class PencilLinesPass extends Pass {
 		loader.load('./cloud-noise.png', (texture) => {
 			this.material.uniforms.uTexture.value = texture
 		})
+		this.BgColor = 'BgColor' in options? options.BgColor : new Vector3(1, 1, 1);
+		this.LineColor='LineColor'in options? options.LineColor : new Vector3(0.32, 0.12, 0.2);
+		this.Edge='Edge'in options? options.Edge : 0.03;
+		// this.material.uniforms.ubgColor.value = this.ubgColor;
 	}
 
 	dispose() {
