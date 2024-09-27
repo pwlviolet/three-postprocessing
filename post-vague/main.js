@@ -91,12 +91,6 @@ let animate = function () {
   // Boxblurpass.Bluroffset.y=params.Bluroffset.y/window.innerHeight
   // Boxblurpass.Bluroffset.z=params.Bluroffset.x/window.innerWidth
   // Boxblurpass.Bluroffset.w=params.Bluroffset.y/window.innerHeight
-  // colorpass.Bluroffset.x=params.Bluroffset.x/window.innerWidth
-  // colorpass.Bluroffset.y=params.Bluroffset.y/window.innerHeight  
-  // colorpass.Brightness=params.Brightness
-  // colorpass.Saturation=params.Saturation
-  // colorpass.Contrast=params.Contrast
-  // colorpass.HueShift=params.HueShift
   requestAnimationFrame(animate);
   cameracontrols.update(clock.getDelta());
   renderer.render(scene, camera);
