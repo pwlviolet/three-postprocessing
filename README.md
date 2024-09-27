@@ -27,3 +27,9 @@ something todo ......
 post-Pencil Effect
 
 ![1727176775349](image/README/1727176775349.png)
+
+post-bloom
+
+screenshot in other project
+
+![1727449413956](image/README/1727449413956.png)
