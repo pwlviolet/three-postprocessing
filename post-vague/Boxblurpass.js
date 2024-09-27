@@ -1,12 +1,17 @@
-import { Vector4 } from 'three';
+import { Vector4, ShaderMaterial, UniformsUtils, WebGLRenderTarget } from 'three';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+// import {
+// 	ShaderMaterial,
+// 	UniformsUtils
+// } from 'three';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 const Boxblurshader = {
 	defines: {
 		gamma: 2.2
 	},
 	uniforms: {
 		tDiffuse: { value: null },
-		_Bluroffset: { value:  new Vector4(1.0/window.innerWidth, 1.0/window.innerHeight,1.0/window.innerWidth, 1.0/window.innerHeight)},
+		_Bluroffset: { value: new Vector4(1.0 / window.innerWidth, 1.0 / window.innerHeight, 1.0 / window.innerWidth, 1.0 / window.innerHeight) },
 	},
 
 	vertexShader: `
@@ -51,7 +56,7 @@ const Boxblurshader = {
 			 color+=texture(tDiffuse,vUv+kernel.xw);
 			 color+=texture(tDiffuse,vUv+kernel.zw);
 			 color*=0.25;
-			 color.rgb=gammaCorrection(color.rgb);
+			//  color.rgb=gammaCorrection(color.rgb);
 
 			 gl_FragColor = vec4(color.xyz,1.0);
 		}`,
@@ -59,7 +64,7 @@ const Boxblurshader = {
 
 
 
-class BoxblurPass extends ShaderPass {
+class BoxblurPass extends Pass {
 	set Bluroffset(v) {
 		this.material.uniforms._Bluroffset.value = v;
 	}
@@ -67,13 +72,74 @@ class BoxblurPass extends ShaderPass {
 		return this.material.uniforms._Bluroffset.value;
 	}
 
-	constructor(options = {}) {
+	constructor(options = {}, textureID) {
+		super()
+		this.textureID = (textureID !== undefined) ? textureID : 'tDiffuse';
+		let shader = Boxblurshader
+		if (shader instanceof ShaderMaterial) {
+			this.uniforms = shader.uniforms;
+			this.material = shader;
+		} else if (shader) {
 
-		super(Boxblurshader);
-		this.Bluroffset = 'Bluroffset' in options? options.Bluroffset : new Vector4(1.0/window.innerWidth, 1.0/window.innerHeight,1.0/window.innerWidth, 1.0/window.innerHeight);
-		console.log(this.material.uniforms.tDiffuse)
+			this.uniforms = UniformsUtils.clone(shader.uniforms);
+			this.material = new ShaderMaterial({
+				name: (shader.name !== undefined) ? shader.name : 'unspecified',
+				defines: Object.assign({}, shader.defines),
+				uniforms: this.uniforms,
+				vertexShader: shader.vertexShader,
+				fragmentShader: shader.fragmentShader
+
+			});
+
+		}
+		this.rt1 = new WebGLRenderTarget(window.innerWidth, window.innerHeight)
+		this.rt2 = new WebGLRenderTarget(window.innerWidth, window.innerHeight)
+		this.fsQuad = new FullScreenQuad(this.material);
+		this.Bluroffset = 'Bluroffset' in options ? options.Bluroffset : new Vector4(1.0 / window.innerWidth, 1.0 / window.innerHeight, 1.0 / window.innerWidth, 1.0 / window.innerHeight);
+		this.count = 'count' in options ? options.count : 1;
+	}
+	render(renderer, writeBuffer, readBuffer /*, deltaTime, maskActive */) {
+
+		if (this.uniforms[this.textureID]) {
+
+			this.uniforms[this.textureID].value = readBuffer.texture;
+
+		}
+
+		this.fsQuad.material = this.material;
+		// this.renderToScreen = false
+		for (let i = 1; i < this.count; i++) {
+			renderer.setRenderTarget(this.rt1)
+			this.fsQuad.render(renderer);
+			// this.rt1
+			this.uniforms[this.textureID].value = this.rt1.texture;
+			renderer.setRenderTarget(this.rt2)
+			this.fsQuad.render(renderer);
+			this.uniforms[this.textureID].value = this.rt2.texture;
+			// this.rt1 = this.rt2
+		}
+
+
+
+
+
+
+		if (this.renderToScreen) {
+
+			renderer.setRenderTarget(null);
+			this.fsQuad.render(renderer);
+
+		} else {
+
+			renderer.setRenderTarget(writeBuffer);
+			// TODO: Avoid using autoClear properties, see https://github.com/mrdoob/three.js/pull/15571#issuecomment-465669600
+			if (this.clear) renderer.clear(renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil);
+			this.fsQuad.render(renderer);
+
+		}
 
 	}
+
 
 }
 

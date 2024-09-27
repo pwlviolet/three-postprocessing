@@ -14,16 +14,13 @@ import CameraControls from 'camera-controls';
 import { TexturePass } from 'three/examples/jsm/Addons.js';
 import { BoxblurPass } from './Boxblurpass';
 let gui = new GUI()
-// const params = {
-//   Bluroffset:
-//   {
-//     x:1.0,
-//     y:1.0
-//   }
-//   // Saturation:1.0,
-//   // Contrast:1.0,
-//   // HueShift:0.0
-// };
+const params = {
+  count: 1
+  // Saturation:1.0,
+  // Contrast:1.0,
+  // HueShift:0.0
+};
+gui.add( params,'count' ).min( 1).max( 10 ).step( 1 );
 // gui.add( params.Bluroffset, 'x' ).min( 0).max( 100 );
 // gui.add( params.Bluroffset, 'y' ).min( 0).max( 100 );
 // gui.add( params, 'Brightness' ).min( -3 ).max( 4);
@@ -41,7 +38,7 @@ const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100000);
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
 });
-camera.position.set(0, 0, 1000);
+camera.position.set(0, 0, 200);
 renderer.setSize(width, height);
 canvas.appendChild(renderer.domElement);
 renderer.render(scene, camera);
@@ -55,21 +52,21 @@ scene.background = pmremGenerator.fromScene(
   0.04
 ).texture;
 cameracontrols = new CameraControls(camera, renderer.domElement);
-const mapbg=await new THREE.TextureLoader().loadAsync('./asoulbg.png')
-const plane= new THREE.Mesh(
-  new THREE.PlaneGeometry(200,100,100,100),
+const mapbg = await new THREE.TextureLoader().loadAsync('./asoulbg.png')
+const plane = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 100, 100, 100),
   new THREE.MeshBasicMaterial({
-    map:mapbg
+    map: mapbg
   })
 );
-mapbg.colorSpace="srgb"
+mapbg.colorSpace = "srgb"
 scene.add(plane);
 
 //effect
 let composer = new EffectComposer(renderer);
-composer.setPixelRatio( window.devicePixelRatio );
-composer.setSize( window.innerWidth, window.innerHeight );
-composer.addPass( new RenderPass( scene, camera ) );
+composer.setPixelRatio(window.devicePixelRatio);
+composer.setSize(window.innerWidth, window.innerHeight);
+composer.addPass(new RenderPass(scene, camera));
 // let colorpass=new ColorPass({
 //   Brightness:1.0,
 //   Saturation:1.0,
@@ -77,15 +74,19 @@ composer.addPass( new RenderPass( scene, camera ) );
 //   HueShift:0.0
 // })
 // let texturepass=new TexturePass(mapbg)
-let Boxblurpass=new BoxblurPass(
+let Boxblurpass = new BoxblurPass(
   {
-    Bluroffset:new THREE.Vector4(1.0/window.innerWidth, 1.0/window.innerHeight,1.0/window.innerWidth, 1.0/window.innerHeight)
+    Bluroffset: new THREE.Vector4(1.0 / window.innerWidth, 1.0 / window.innerHeight, 1.0 / window.innerWidth, 1.0 / window.innerHeight)
   }
 )
 composer.addPass(Boxblurpass)
+// composer.addPass(Boxblurpass)
+// composer.addPass(Boxblurpass)
+// composer.addPass(Boxblurpass)
 // composer.addPass(colorpass)
 
 let animate = function () {
+  Boxblurpass.count= params.count
   // Boxblurpass.Bluroffset.x=params.Bluroffset.x/window.innerWidth
   // Boxblurpass.Bluroffset.y=params.Bluroffset.y/window.innerHeight
   // Boxblurpass.Bluroffset.z=params.Bluroffset.x/window.innerWidth

@@ -8,7 +8,7 @@ post-rgba
 
 post-vague
 
-![1726407903158](image/README/1726407903158.png)
+![1727437764055](image/README/1727437764055.png)
 
 post-vignetting
 
@@ -20,8 +20,6 @@ post-outline
 
 something todo ......
 
-
 post-Pencil Effect
-
 
 ![1727176775349](image/README/1727176775349.png)
