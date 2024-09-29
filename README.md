@@ -30,6 +30,4 @@ post-Pencil Effect
 
 post-bloom
 
-screenshot in other project
-
-![1727449413956](image/README/1727449413956.png)
+![1727619486019](image/README/1727619486019.png)
