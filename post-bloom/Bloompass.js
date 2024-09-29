@@ -74,7 +74,9 @@ const ExtractBrightshader={
 	},
 	uniforms: {
 		tDiffuse: { value: null },
-		_LuminanceThreshold:{value:0.5}
+		_LuminanceThreshold:{value:0.5},
+		_Intensity:{value:1.0}
+
 	},
 
 	vertexShader: `
@@ -88,6 +90,7 @@ const ExtractBrightshader={
 	fragmentShader: `
 		uniform sampler2D tDiffuse;
 		uniform float _LuminanceThreshold;
+		uniform float _Intensity;
 		varying vec2 vUv;
 		//饱和度
         float luminance( vec3 rgb ) {
@@ -107,7 +110,8 @@ const ExtractBrightshader={
 		void main() {
 		    vec4 c = texture(tDiffuse,vUv);
             float val = clamp(luminance(c.xyz) - _LuminanceThreshold, 0.0, 1.0); // 将亮度通过阈值后限定在[0,1]中用于混合
-            gl_FragColor= c * val;
+            gl_FragColor= c * val * _Intensity;;
+
 		}`,
 };
 const mixshader={
@@ -154,19 +158,30 @@ const mixshader={
 		}`,
 };
 class BloomPass extends Pass {
-	// set v(v) {
-	// 	this.material.uniforms.v.value = v;
-	// }
-	// get v() {
-	// 	return this.material.uniforms.v.value;
-	// }
-	// set h(v) {
-	// 	this.material.uniforms.h.value = v;
-	// }
-	// get h() {
-	// 	return this.material.uniforms.h.value;
-	// }
-
+	set v(v) {
+		this.blur_material.uniforms.v.value = v;
+	}
+	get v() {
+		return this.blur_material.uniforms.v.value;
+	}
+	set h(v) {
+		this.blur_material.uniforms.h.value = v;
+	}
+	get h() {
+		return this.blur_material.uniforms.h.value;
+	}
+	set LuminanceThreshold(v) {
+		this.material.uniforms._LuminanceThreshold.value = v;
+	}
+	get LuminanceThreshold() {
+		return this.material.uniforms._LuminanceThreshold.value;
+	}
+	set Intensity(v) {
+		this.material.uniforms._Intensity.value = v;
+	}
+	get Intensity() {
+		return this.material.uniforms._Intensity.value;
+	}
 	constructor(options = {}, textureID) {
 		super()
 		this.textureID = (textureID !== undefined) ? textureID : 'tDiffuse';
@@ -226,8 +241,11 @@ class BloomPass extends Pass {
 		this.rt1=new WebGLRenderTarget(window.innerWidth, window.innerHeight);
 		this.rt2=new WebGLRenderTarget(window.innerWidth, window.innerHeight);
 		// this.Bluroffset = 'Bluroffset' in options ? options.Bluroffset : new Vector4(1.0 / window.innerWidth, 1.0 / window.innerHeight, 1.0 / window.innerWidth, 1.0 / window.innerHeight);
-		// this.v='v'in options? options.v : 3.0 / window.innerHeight;
-		// this.h='h'in options? options.h : 3.0 / window.innerWidth;
+		this.v='v'in options? options.v : 3.0 / window.innerHeight;
+		this.h='h'in options? options.h : 3.0 / window.innerWidth;
+		this.LuminanceThreshold='_LuminanceThreshold'in options? options.LuminanceThreshold : 0.5;
+		this.Intensity='_Intensity'in options? options.Intensity : 1.0;
+
 	}
 	render(renderer, writeBuffer, readBuffer /*, deltaTime, maskActive */) {
 

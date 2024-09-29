@@ -13,13 +13,17 @@ import { BloomPass } from './Bloompass';
 let gui = new GUI()
 const params = {
   v: 3,
-  h: 3
+  h: 3,
+  Intensity:1.0,
+  LuminanceThreshold:0.5,
   // Saturation:1.0,
   // Contrast:1.0,
   // HueShift:0.0
 };
 gui.add(params, 'v').min(1).max(10).step(1);
 gui.add(params, 'h').min(1).max(10).step(1);
+gui.add(params, 'Intensity').min(0).max(10).step(0.1);
+gui.add(params, 'LuminanceThreshold').min(0).max(1).step(0.1);
 const canvas = document.getElementById('three-canvas');
 CameraControls.install({ THREE: THREE });
 let cameracontrols;
@@ -60,21 +64,16 @@ let composer = new EffectComposer(renderer);
 composer.setPixelRatio(window.devicePixelRatio);
 composer.setSize(window.innerWidth, window.innerHeight);
 composer.addPass(new RenderPass(scene, camera));
-// let colorpass=new ColorPass({
-//   Brightness:1.0,
-//   Saturation:1.0,
-//   Contrast:1.0,
-//   HueShift:0.0
-// })
-// let texturepass=new TexturePass(mapbg)
+
 let bloompass = new  BloomPass()
 composer.addPass(bloompass)
 
 
 let animate = function () {
-
-  // colorpass.Bluroffset.x=params.Bluroffset.x
-
+  bloompass.v = params.v/window.innerWidth
+  bloompass.h = params.h/window.innerHeight
+  bloompass.Intensity=params.Intensity
+  bloompass.LuminanceThreshold=params.LuminanceThreshold
   requestAnimationFrame(animate);
   cameracontrols.update(clock.getDelta());
   renderer.render(scene, camera);
