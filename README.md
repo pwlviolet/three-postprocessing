@@ -31,3 +31,7 @@ post-Pencil Effect
 post-bloom
 
 ![1727619486019](image/README/1727619486019.png)
+
+post-Mix
+
+![1728650413686](image/README/1728650413686.png)

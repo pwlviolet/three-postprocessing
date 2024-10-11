@@ -8,9 +8,11 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 // import { ColorPass } from './Colorpass';
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min'
-import {ColorPass} from "three-postprocessing-effect"
-console.log(ColorPass)
+import { MixtexturePass } from './Mixtexturepass'
+// import {ColorPass} from "three-postprocessing-effect"
+// console.log(ColorPass)
 import CameraControls from 'camera-controls';
+
 let gui = new GUI()
 const params = {
   Brightness:1.0,
@@ -18,10 +20,10 @@ const params = {
   Contrast:1.0,
   HueShift:0.0
 };
-gui.add( params, 'Brightness' ).min( 0).max( 2);
-gui.add( params, 'Saturation' ).min( -3 ).max( 4 );
-gui.add( params, 'Contrast' ).min( -3 ).max( 4 );
-gui.add( params, 'HueShift' ).min( 0 ).max( 1 );
+// gui.add( params, 'Brightness' ).min( 0).max( 2);
+// gui.add( params, 'Saturation' ).min( -3 ).max( 4 );
+// gui.add( params, 'Contrast' ).min( -3 ).max( 4 );
+// gui.add( params, 'HueShift' ).min( 0 ).max( 1 );
 const canvas = document.getElementById('three-canvas');
 CameraControls.install({ THREE: THREE });
 let cameracontrols;
@@ -56,24 +58,36 @@ const plane= new THREE.Mesh(
 );
 mapbg.colorSpace="srgb"
 scene.add(plane);
-
+// renderer.outputColorSpace="srgb-linear"
 //effect
 let composer = new EffectComposer(renderer);
 composer.setPixelRatio( window.devicePixelRatio );
 composer.setSize( window.innerWidth, window.innerHeight );
 composer.addPass( new RenderPass( scene, camera ) );
-let colorpass=new ColorPass({
-  Brightness:1.0,
-  Saturation:1.0,
-  Contrast:1.0,
-  HueShift:0.0
+let brokenglass=await new THREE.TextureLoader().loadAsync('./BrokenGlassRe_Mask.png')
+let brokenormal=await new THREE.TextureLoader().loadAsync('./BrokenGlassRe_Normal_Fixed.png')
+
+brokenglass.colorSpace="srgb"
+// brokenglass.wrapS=THREE.RepeatWrapping
+// brokenglass.wrapT=THREE.RepeatWrapping
+// brokenglass.repeat.set(10,10)
+// let normal=await new THREE.TextureLoader().loadAsync('./normal.png')
+let mixpass=new MixtexturePass({
+texture:brokenglass,
+textureNormal:brokenormal
 })
-composer.addPass(colorpass)
+// let colorpass=new ColorPass({
+//   Brightness:1.0,
+//   Saturation:1.0,
+//   Contrast:1.0,
+//   HueShift:0.0
+// })
+composer.addPass(mixpass)
 let animate = function () {
-  colorpass.Brightness=params.Brightness
-  colorpass.Saturation=params.Saturation
-  colorpass.Contrast=params.Contrast
-  colorpass.HueShift=params.HueShift
+  // colorpass.Brightness=params.Brightness
+  // colorpass.Saturation=params.Saturation
+  // colorpass.Contrast=params.Contrast
+  // colorpass.HueShift=params.HueShift
   requestAnimationFrame(animate);
   cameracontrols.update(clock.getDelta());
   renderer.render(scene, camera);
