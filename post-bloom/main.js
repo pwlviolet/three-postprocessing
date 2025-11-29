@@ -16,6 +16,7 @@ const params = {
   h: 3,
   Intensity:1.0,
   LuminanceThreshold:0.5,
+  Ratio:1.5
   // Saturation:1.0,
   // Contrast:1.0,
   // HueShift:0.0
@@ -24,6 +25,7 @@ gui.add(params, 'v').min(1).max(10).step(1);
 gui.add(params, 'h').min(1).max(10).step(1);
 gui.add(params, 'Intensity').min(0).max(10).step(0.1);
 gui.add(params, 'LuminanceThreshold').min(0).max(1).step(0.1);
+// gui.add(params, 'Ratio').min(0.5).max(10).step(0.5);
 const canvas = document.getElementById('three-canvas');
 CameraControls.install({ THREE: THREE });
 let cameracontrols;
@@ -35,6 +37,7 @@ const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100000);
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
 });
+renderer.setPixelRatio(1.5);
 camera.position.set(0, 0, 200);
 renderer.setSize(width, height);
 canvas.appendChild(renderer.domElement);

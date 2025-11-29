@@ -17,6 +17,7 @@
     "postprocessing": "^6.36.2",
     "three": "^0.159.0",
     "three-mesh-ui": "^6.5.4",
+    "three-perf": "^1.0.10",
     "three-postprocessing-effect": "^1.0.1"
   }
 }

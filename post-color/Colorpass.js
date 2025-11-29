@@ -53,9 +53,30 @@ const Colorshader = {
     		float e = 1.0e-10;
     		return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 		}
-
+    vec4 bilinearInterpolation(sampler2D tex, vec2 uv) {
+      vec2 texSize = vec2(textureSize(tex, 0));
+      vec2 uvScaled = uv * texSize - 0.5;
+      vec2 uvFloor = floor(uvScaled);
+      vec2 uvFrac = fract(uvScaled);
+      
+      vec2 uv00 = (uvFloor + vec2(0.0, 0.0)) / texSize;
+      vec2 uv10 = (uvFloor + vec2(1.0, 0.0)) / texSize;
+      vec2 uv01 = (uvFloor + vec2(0.0, 1.0)) / texSize;
+      vec2 uv11 = (uvFloor + vec2(1.0, 1.0)) / texSize;
+      
+      vec4 tex00 = texture2D(tex, uv00);
+      vec4 tex10 = texture2D(tex, uv10);
+      vec4 tex01 = texture2D(tex, uv01);
+      vec4 tex11 = texture2D(tex, uv11);
+      
+      vec4 texX0 = mix(tex00, tex10, uvFrac.x);
+      vec4 texX1 = mix(tex01, tex11, uvFrac.x);
+      vec4 result = mix(texX0, texX1, uvFrac.y);
+      
+      return result;
+    }
 		void main() {
-			 vec4 Diffuse=texture(tDiffuse,vUv);
+			 vec4 Diffuse=texture2D(tDiffuse,vUv);
 			 Diffuse.rgb= gammaCorrection(Diffuse.rgb);
 			 //色相
 			 vec3 finalcolor=Diffuse.rgb;

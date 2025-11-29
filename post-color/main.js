@@ -31,7 +31,7 @@ const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100000);
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
 });
-camera.position.set(0, 0, 1000);
+camera.position.set(0, 0, 10);
 renderer.setSize(width, height);
 canvas.appendChild(renderer.domElement);
 renderer.render(scene, camera);
@@ -47,7 +47,7 @@ scene.background = pmremGenerator.fromScene(
 cameracontrols = new CameraControls(camera, renderer.domElement);
 const mapbg=await new THREE.TextureLoader().loadAsync('./asoulbg.png')
 const plane= new THREE.Mesh(
-  new THREE.PlaneGeometry(200,100,100,100),
+  new THREE.PlaneGeometry(20,10,100 ,100),
   new THREE.MeshBasicMaterial({
     map:mapbg
   })
