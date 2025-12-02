@@ -47,7 +47,10 @@ const CloudShader = {
         uInverseProjectionMatrix: { value: null },
         uLightPos: { value: new Vector3(100, 100, 100) },
         uCloudColor: { value: new Color(0xffffff) },
-        uNoiseScale: { value: 1.0 }
+        uNoiseScale: { value: 1.0 },
+        uDebug: { value: 0 },
+        uCameraNear: { value: 0.1 },
+        uCameraFar: { value: 1000.0 }
 	},
 	vertexShader: `
 		varying vec2 vUv;
@@ -68,6 +71,9 @@ const CloudShader = {
         uniform vec3 uLightPos;
         uniform vec3 uCloudColor;
         uniform float uNoiseScale;
+        uniform int uDebug;
+        uniform float uCameraNear;
+        uniform float uCameraFar;
 
 		varying vec2 vUv;
 
@@ -122,12 +128,38 @@ const CloudShader = {
             return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
         }
 
-        vec3 getWorldPos(float depth, vec2 uv) {
-            vec4 clipSpacePosition = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-            vec4 viewSpacePosition = uInverseProjectionMatrix * clipSpacePosition;
-            viewSpacePosition /= viewSpacePosition.w;
-            vec4 worldSpacePosition = uInverseViewMatrix * viewSpacePosition;
-            return worldSpacePosition.xyz;
+        vec3 getWorldPos(float linearDepth, vec2 uv) {
+            // 1. Recover viewZ (negative value in View Space) from linear depth
+            float viewZ = linearDepth * (uCameraNear - uCameraFar) - uCameraNear;
+
+            // 2. Calculate View Space Ray (pointing to Far Plane, NDC z=1.0)
+            vec4 ndcRay = vec4(uv * 2.0 - 1.0, 1.0, 1.0);
+            vec4 viewRay = uInverseProjectionMatrix * ndcRay;
+            viewRay.xyz /= viewRay.w; // Point on the far plane in view space
+            
+            // 3. Calculate World Space Ray Direction (Rotate View Ray to World Space)
+            // uInverseViewMatrix is Camera World Matrix. We only rotate direction (w=0.0)
+            // Mathematically equivalent to (uInverseViewMatrix * vec4(viewPos, 1.0)).xyz but cheaper and gives us the Ray Dir
+            vec3 worldRayDir = (uInverseViewMatrix * vec4(viewRay.xyz, 0.0)).xyz;
+
+            // 4. Reconstruct World Position: CameraPos + RayDir * Scale
+            // Scale is determined by the ratio of target ViewZ to the Ray's ViewZ
+            // This accounts for the planar nature of the depth buffer (avoids fish-eye distortion)
+            float scale = viewZ / viewRay.z;
+            
+            return uCameraPos + worldRayDir * scale;
+        }
+
+        float fbm(vec3 x) {
+            float v = 0.0;
+            float a = 0.5;
+            vec3 shift = vec3(100.0);
+            for (int i = 0; i < 5; ++i) {
+                v += a * snoise(x);
+                x = x * 2.0 + shift;
+                a *= 0.5;
+            }
+            return v;
         }
 
 		void main() {
@@ -135,7 +167,7 @@ const CloudShader = {
             vec4 cloudDepthSample = texture(tCloudDepth, vUv);
             vec4 cloudNormalSample = texture(tCloudNormal, vUv);
             
-            float cloudDepthVal = cloudDepthSample.r; // Assuming depth in R
+            float cloudDepthVal = cloudDepthSample.r; // Linear Depth [0, 1]
             float alpha = cloudDepthSample.a; // Alpha from blur
             
             // Basic check if there is a cloud here
@@ -144,11 +176,12 @@ const CloudShader = {
                 return;
             }
 
-            // Reconstruct world position
+            // Reconstruct world position directly from linear depth
             vec3 worldPos = getWorldPos(cloudDepthVal, vUv);
             
-            // Noise
-            float noiseVal = snoise(worldPos * uNoiseScale);
+            // Noise (FBM)
+            // float noiseVal = snoise(worldPos * uNoiseScale);
+            float noiseVal = fbm(worldPos * uNoiseScale);
             //  float noiseVal = snoise(worldPos * uNoiseScale + vec3(0.0, uTime * 0.1, 0.0));
             // Perturb depth (visual only for lighting/shading, we don't actually change the depth buffer)
             // We use noise to modify the normal
@@ -158,12 +191,13 @@ const CloudShader = {
             // Simple normal perturbation based on noise gradient (approximated)
             // Or just use noise to affect color brightness
             // Let's try to perturb normal slightly
+            float epsilon = 0.1;
             vec3 noiseGrad = vec3(
-                snoise(worldPos * uNoiseScale + vec3(0.1, 0.0, 0.0)) - noiseVal,
-                snoise(worldPos * uNoiseScale + vec3(0.0, 0.1, 0.0)) - noiseVal,
-                snoise(worldPos * uNoiseScale + vec3(0.0, 0.0, 0.1)) - noiseVal
+                fbm(worldPos * uNoiseScale + vec3(epsilon, 0.0, 0.0)) - noiseVal,
+                fbm(worldPos * uNoiseScale + vec3(0.0, epsilon, 0.0)) - noiseVal,
+                fbm(worldPos * uNoiseScale + vec3(0.0, 0.0, epsilon)) - noiseVal
             );
-            vec3 finalNormal = normalize(normal - noiseGrad * 5.0); // Strength of bump
+            vec3 finalNormal = normalize(normal - noiseGrad * 0.2); // Strength of bump
 
             // Lighting (Blinn-Phong)
             vec3 lightDir = normalize(uLightPos - worldPos);
@@ -173,8 +207,8 @@ const CloudShader = {
             float diff = max(dot(finalNormal, lightDir), 0.0);
             float spec = pow(max(dot(finalNormal, halfDir), 0.0), 32.0);
             
-            vec3 ambient = vec3(0.2) * uCloudColor;
-            vec3 diffuse = diff * uCloudColor;
+            vec3 ambient = vec3(0.4) * uCloudColor;
+            vec3 diffuse = diff * uCloudColor * 0.8; // Reduce diffuse contrast slightly
             vec3 specular = vec3(spec);
             
             vec3 cloudFinalColor = ambient + diffuse + specular;
@@ -192,7 +226,35 @@ const CloudShader = {
             // If cloud is behind scene object, we shouldn't render it?
             // But for now, just mix based on alpha
             
-            gl_FragColor = mix(baseColor, vec4(cloudFinalColor, 1.0), alpha);
+            // Adjust alpha and color to make gray areas more white and slightly transparent
+            float brightness = dot(cloudFinalColor, vec3(0.299, 0.587, 0.114));
+            
+            // Boost ambient/dark areas to be more white
+            // Mix current color towards pure white based on inverse brightness
+            // Strong whitening for dark areas
+            vec3 whitenedColor = mix(cloudFinalColor, vec3(1.0), 0.8 * (1.0 - brightness));
+            
+            // Reduce alpha significantly for dark/shadowed areas to make them see-through
+            // Logic: The darker the pixel (shadow), the more transparent it becomes
+            float finalAlpha = alpha * (0.3 + 0.7 * smoothstep(0.15, 0.7, brightness));
+
+            vec4 finalColor = mix(baseColor, vec4(whitenedColor, 1.0), finalAlpha);
+
+            if (uDebug == 1) {
+                // Debug Perturbed Normal
+                gl_FragColor = vec4(finalNormal * 0.5 + 0.5, 1.0);
+            } else if (uDebug == 2) {
+                // Debug Noise
+                gl_FragColor = vec4(vec3(noiseVal), 1.0);
+            } else if (uDebug == 3) {
+                // Debug Linear Depth
+                gl_FragColor = vec4(vec3(cloudDepthVal), 1.0);
+            } else if (uDebug == 4) {
+                // Debug Input Normal
+                gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
+            } else {
+                gl_FragColor = vec4(finalColor);
+            }
 		}`
 };
 
@@ -204,7 +266,7 @@ class CloudPass extends Pass {
         this.camera = camera;
 
         this.tempRT1 = new WebGLRenderTarget(cloudNormalRT.width, cloudNormalRT.height);
-        this.tempRT2 = new WebGLRenderTarget(cloudNormalRT.width, cloudNormalRT.height);
+        // this.tempRT2 = new WebGLRenderTarget(cloudNormalRT.width, cloudNormalRT.height);
         
         // Blur Materials
         this.blurMaterial = new ShaderMaterial({
@@ -231,57 +293,57 @@ class CloudPass extends Pass {
         this.blurQuad = new FullScreenQuad(this.blurMaterial);
 	}
 
-    blurTexture(renderer, inputRT, outputRT, iterations = 2) {
-        let readBuffer = inputRT;
-        let writeBuffer = this.tempRT1;
+    // blurTexture(renderer, inputRT, outputRT, iterations = 2) {
+    //     let readBuffer = inputRT;
+    //     let writeBuffer = this.tempRT1;
         
-        for (let i = 0; i < iterations; i++) {
-            // Horizontal or one pass (current shader is simple 2D blur)
-            // If separable, we'd do H then V. The current shader seems to be a combined kernel or just simple.
-            // BloomPass used v and h uniforms.
+    //     for (let i = 0; i < iterations; i++) {
+    //         // Horizontal or one pass (current shader is simple 2D blur)
+    //         // If separable, we'd do H then V. The current shader seems to be a combined kernel or just simple.
+    //         // BloomPass used v and h uniforms.
             
-            // Pass 1
-            this.blurMaterial.uniforms.tDiffuse.value = readBuffer.texture;
-            this.blurMaterial.uniforms.h.value = 1.0 / readBuffer.width;
-            this.blurMaterial.uniforms.v.value = 0.0; // Horizontal? Or just use combined
-            // Actually the BlurShader I copied from BloomPass has both H and V loops in one go?
-            // Wait, BloomPass shader:
-            // sum += texture(..., y - 4*v) ... Vertical
-            // sum += texture(..., x - 4*h) ... Horizontal
-            // It does BOTH in one shader execution. That's actually not a correct Gaussian blur (it adds them, doesn't convolve fully in 2D properly, but it's a "star" blur).
-            // For "blur twice", we can just run this shader twice.
+    //         // Pass 1
+    //         this.blurMaterial.uniforms.tDiffuse.value = readBuffer.texture;
+    //         this.blurMaterial.uniforms.h.value = 1.0 / readBuffer.width;
+    //         this.blurMaterial.uniforms.v.value = 0.0; // Horizontal? Or just use combined
+    //         // Actually the BlurShader I copied from BloomPass has both H and V loops in one go?
+    //         // Wait, BloomPass shader:
+    //         // sum += texture(..., y - 4*v) ... Vertical
+    //         // sum += texture(..., x - 4*h) ... Horizontal
+    //         // It does BOTH in one shader execution. That's actually not a correct Gaussian blur (it adds them, doesn't convolve fully in 2D properly, but it's a "star" blur).
+    //         // For "blur twice", we can just run this shader twice.
             
-            this.blurMaterial.uniforms.v.value = 1.0 / readBuffer.height;
-            this.blurMaterial.uniforms.h.value = 1.0 / readBuffer.width;
+    //         this.blurMaterial.uniforms.v.value = 1.0 / readBuffer.height;
+    //         this.blurMaterial.uniforms.h.value = 1.0 / readBuffer.width;
             
-            renderer.setRenderTarget(writeBuffer);
-            this.blurQuad.render(renderer);
+    //         renderer.setRenderTarget(writeBuffer);
+    //         this.blurQuad.render(renderer);
             
-            // Swap
-            let temp = readBuffer;
-            readBuffer = writeBuffer;
-            writeBuffer = (i === iterations - 1) ? outputRT : temp; 
-            // Logic is tricky. 
-            // Iteration 0: Input -> Temp1
-            // Iteration 1: Temp1 -> Temp2 (if we had 2 temps) or Temp1 -> Output
-        }
+    //         // Swap
+    //         let temp = readBuffer;
+    //         readBuffer = writeBuffer;
+    //         writeBuffer = (i === iterations - 1) ? outputRT : temp; 
+    //         // Logic is tricky. 
+    //         // Iteration 0: Input -> Temp1
+    //         // Iteration 1: Temp1 -> Temp2 (if we had 2 temps) or Temp1 -> Output
+    //     }
         
-        // Simplified: Input -> Temp1 -> Output (2 passes)
+    //     // Simplified: Input -> Temp1 -> Output (2 passes)
         
-        // Pass 1: Input -> Temp1
-        this.blurMaterial.uniforms.tDiffuse.value = inputRT.texture;
-        this.blurMaterial.uniforms.h.value = 2.0 / inputRT.width; // Stronger blur?
-        this.blurMaterial.uniforms.v.value = 2.0 / inputRT.height;
-        renderer.setRenderTarget(this.tempRT1);
-        this.blurQuad.render(renderer);
+    //     // Pass 1: Input -> Temp1
+    //     this.blurMaterial.uniforms.tDiffuse.value = inputRT.texture;
+    //     this.blurMaterial.uniforms.h.value = 2.0 / inputRT.width; // Stronger blur?
+    //     this.blurMaterial.uniforms.v.value = 2.0 / inputRT.height;
+    //     renderer.setRenderTarget(this.tempRT1);
+    //     this.blurQuad.render(renderer);
         
-        // Pass 2: Temp1 -> Temp2 (We will use Temp2 as final blurred result for this frame)
-        this.blurMaterial.uniforms.tDiffuse.value = this.tempRT1.texture;
-        renderer.setRenderTarget(this.tempRT2);
-        this.blurQuad.render(renderer);
+    //     // Pass 2: Temp1 -> Temp2 (We will use Temp2 as final blurred result for this frame)
+    //     this.blurMaterial.uniforms.tDiffuse.value = this.tempRT1.texture;
+    //     renderer.setRenderTarget(this.tempRT2);
+    //     this.blurQuad.render(renderer);
         
-        return this.tempRT2.texture;
-    }
+    //     return this.tempRT2.texture;
+    // }
 
 	render(renderer, writeBuffer, readBuffer) {
         // Update Cloud Shader Uniforms
@@ -290,6 +352,8 @@ class CloudPass extends Pass {
         this.cloudMaterial.uniforms.uCameraPos.value.copy(this.camera.position);
         this.cloudMaterial.uniforms.uInverseViewMatrix.value = this.camera.matrixWorld;
         this.cloudMaterial.uniforms.uInverseProjectionMatrix.value = this.camera.projectionMatrixInverse;
+        this.cloudMaterial.uniforms.uCameraNear.value = this.camera.near;
+        this.cloudMaterial.uniforms.uCameraFar.value = this.camera.far;
 
         // Blur Normals
         // We need to store the result somewhere. I'll reuse tempRTs but I need two results (normal and depth).
@@ -312,6 +376,8 @@ class CloudPass extends Pass {
         // Blur Normal -> this.blurredNormalRT
         // Pass 1
         this.blurMaterial.uniforms.tDiffuse.value = this.cloudNormalRT.texture;
+        this.blurMaterial.uniforms.h.value = 1.0 / this.cloudNormalRT.width;
+        this.blurMaterial.uniforms.v.value = 1.0 / this.cloudNormalRT.height; // Horizontal? Or just use combined
         renderer.setRenderTarget(this.tempRT1);
         this.blurQuad.render(renderer);
         // Pass 2

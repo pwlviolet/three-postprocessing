@@ -113,6 +113,21 @@ lightFolder.addColor({ color: 0xffffff }, 'color').onChange((v) => {
     cloudPass.cloudMaterial.uniforms.uCloudColor.value.set(v);
 }).name('Light Color');
 
+const debugParams = { mode: 0, noiseScale: 1.0, displaceStrength: 0.5, rimStrength: 0.5, cloudBrightness: 0.8 };
+const debugFolder = gui.addFolder('Cloud Settings');
+debugFolder.add(debugParams, 'mode', { 
+    'None': 0, 
+    'Perturbed Normal': 1, 
+    'Noise': 2, 
+    'Linear Depth': 3, 
+    'Input Normal': 4 
+}).name('Debug View').onChange((v) => {
+    cloudPass.cloudMaterial.uniforms.uDebug.value = parseInt(v);
+});
+debugFolder.add(debugParams, 'noiseScale', 0.1, 5000.0).onChange((v) => {
+    cloudPass.cloudMaterial.uniforms.uNoiseScale.value = v;
+});
+
 // G-Buffer Setup
 const rtWidth = window.innerWidth / 2;
 const rtHeight = window.innerHeight / 2;
@@ -147,33 +162,25 @@ const depthMaterial = new ShaderMaterial({
     cameraFar: { value: camera.far }
   },
   vertexShader: `
-    varying float vDepth;
+    varying float vViewZ;
     void main() {
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      vDepth = gl_Position.z / gl_Position.w;
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vViewZ = mvPosition.z;
+      gl_Position = projectionMatrix * mvPosition;
     }
   `,
   fragmentShader: `
     uniform float cameraNear;
     uniform float cameraFar;
-    varying float vDepth;
-
+    varying float vViewZ;
+    #include <packing>
     void main() {
-      // Linearize depth for visualization
-      float ndc = vDepth * 2.0 - 1.0; 
-      float linearDepth = (2.0 * cameraNear * cameraFar) / (cameraFar + cameraNear - ndc * (cameraFar - cameraNear));
-      float gray = linearDepth / cameraFar; // Normalize to 0-1 range based on far plane
-      
-      // Or simply visualize the non-linear depth buffer directly if preferred, but linearized is usually better for debugging
-      // For a quick "visible" check, we can just output the raw depth or a powered version to see contrast
-      // gl_FragColor = vec4(vec3(vDepth), 1.0); 
-
-      // Better visualization for large depth ranges:
-      // Map a smaller range to 0-1. For example, let's make the first 1000 units visible.
-      float displayDepth = linearDepth / 1000.0; 
-      gl_FragColor = vec4(vec3(displayDepth), 1.0);
+      // viewZToOrthographicDepth converts viewZ to normalized linear depth [0, 1]
+      float linearDepth = viewZToOrthographicDepth(vViewZ, cameraNear, cameraFar);
+      gl_FragColor = vec4(vec3(linearDepth), 1.0);
     }
-  `
+  `,
+  // side:1
 });
 
 // HUD for G-Buffer Visualization
